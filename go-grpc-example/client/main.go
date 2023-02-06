@@ -11,7 +11,7 @@ import (
 
 func main() {
 	//连接到server端，此处禁用安全传输，没有加密和验证
-	conn, err := grpc.Dial("127.0.0.1:9090", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.Dial("127.0.0.1:9091", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect %v", err)
 	}
@@ -19,7 +19,11 @@ func main() {
 	defer conn.Close()
 
 	client := pb.NewSayHelloClient(conn)
-	resp, _ := client.SayHello(context.Background(), &pb.HelloRequest{RequestName: "feng"})
+	resp, err := client.SayHello(context.Background(), &pb.HelloRequest{RequestName: "feng"})
+	if err != nil {
+		fmt.Println("resp", err)
+	}
+
 	fmt.Println(resp.GetResponseMsg())
-	fmt.Println("end...")
+	//fmt.Println("end...")
 }

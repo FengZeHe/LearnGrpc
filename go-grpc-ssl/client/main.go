@@ -5,13 +5,18 @@ import (
 	"fmt"
 	pb "github.com/grpcssl/server/proto"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
+	"log"
 )
 
 func main() {
-	conn, err := grpc.Dial("127.0.0.1:9092", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	creds, err := credentials.NewClientTLSFromFile("./conf/server.pem", "go-grpc-example")
 	if err != nil {
-		fmt.Println("Connection failure ")
+		log.Fatalf("credentials.NewClientTLSFromFile err: %v", err)
+	}
+	conn, err := grpc.Dial("127.0.0.1:9092", grpc.WithTransportCredentials(creds))
+	if err != nil {
+		fmt.Println("Connection failure ", err)
 		return
 	}
 

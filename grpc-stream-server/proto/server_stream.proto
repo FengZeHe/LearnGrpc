@@ -1,0 +1,14 @@
+syntax ="proto3";
+
+option go_package = ".;StreamServer";
+message SimpleRequest{
+  string data = 1;
+}
+
+message StreamResponse{
+  string stream_value = 1;
+}
+
+service StreamServer {
+  rpc ListValue(SimpleRequest) returns(stream StreamResponse){};
+}

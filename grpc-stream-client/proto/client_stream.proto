@@ -1,0 +1,18 @@
+syntax = "proto3";
+option  go_package = ".;ClientStream";
+
+
+message StreamRequest{
+  string stream_data = 1;
+}
+
+message SimpleResponse {
+  int32 code = 1;
+  string value = 2;
+}
+
+service StreamClient{
+  rpc RouteList(stream StreamRequest) returns ( SimpleResponse){};
+}
+
+

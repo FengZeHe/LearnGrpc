@@ -6,7 +6,9 @@
 ## gRPC
 ### gRPC hello-world
 
-### gRPC 使用ssl加密
+### gRPC 使用ssl认证
+
+### gRPC 使用token认证
 
 ### gRPC 流
 

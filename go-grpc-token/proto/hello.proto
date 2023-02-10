@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+option go_package=".;grpctoken";
+
+message SimpleRequest {
+  string data = 1;
+}
+
+message SimpleResponse {
+  int32 code = 1;
+  string value =2;
+}
+
+service SayHello{
+  rpc SayHello(SimpleRequest) returns (SimpleResponse){};
+}

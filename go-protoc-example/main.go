@@ -15,7 +15,7 @@ func main() {
 	person1.PersonId = 1
 
 	bytes, _ := json.Marshal(person1)
-	fmt.Println("bytes =", bytes, " \n", string(bytes))
+	fmt.Println("bytes =", bytes, " \n", "person1 : ", string(bytes))
 
 	out, err := proto.Marshal(&person1)
 	if err != nil {
@@ -30,5 +30,5 @@ func main() {
 		fmt.Println(err)
 	}
 	bytes, _ = json.Marshal(person2)
-	fmt.Println(string(bytes))
+	fmt.Println("person2", string(bytes))
 }

@@ -102,7 +102,7 @@ source .bash_profile
 go get -u google.golang.org/protobuf
 ```
 
-```go
+``` go
 // 将一个对象序列化再反序列化
 func main() {
 	person1 := person.Person{}
@@ -195,7 +195,7 @@ message  HelloResponse {
 
 - 创建gRPC Server对象
 
-  ```go
+  ``` go
   grpcServer := grpc.NewServer()
   ```
 
@@ -213,7 +213,7 @@ message  HelloResponse {
 
 - gRPC Server 运行
 
-  ```go
+  ``` go
   grpcServer.Serve(listen)
   ```
 
@@ -230,13 +230,13 @@ message  HelloResponse {
 
 - 创建server的客户端对象
 
-  ```go
+  ``` go
   client := pb.NewSayHelloClient(conn)
   ```
 
 - 发送RPC请求，等待同步响应，得到回调后返回响应结果
 
-  ```go
+  ``` go
   resp, err := client.SayHello(context.Background(), &pb.HelloRequest{RequestName: "feng"})
   	if err != nil {
   		fmt.Println("resp", err)
@@ -413,13 +413,13 @@ IP      = 127.0.0.1
 
 1. 客户端引用证书文件和密钥构造TLS凭证
 
-   ```go
+   ``` go
    creds, err := credentials.NewClientTLSFromFile("./conf/server.pem", "go-grpc-example")
    ```
 
 2. grpc.Dial 配置连接选项
 
-   ```go
+   ``` go
    conn, err := grpc.Dial("127.0.0.1:9092", grpc.WithTransportCredentials(creds))
    ```
 
@@ -533,7 +533,7 @@ protoc --go-grpc_out=. /*proto
 
 #### Auth
 
-```go
+``` go
 // Token 认证
 type Token struct {
 	AppID     string
@@ -555,7 +555,7 @@ func (t *Token) RequireTransportSecurity() bool {
 
 #### Server端
 
-```go
+``` go
 func main() {
 	//	监听本地端口
 	listener, err := net.Listen(Network, Address)
@@ -693,7 +693,7 @@ gRPC提供了拦截器(Interceptor)功能，包括客户端拦截器和服务端
 - `invoker` ： 可以看做是当前RPC方法，一般在拦截器中调用invoker能达到调用RPC方法的效果，底层也是RPC处理
 - `opts` ：本次调用指定的options信息
 
-```go
+``` go
 type UnaryClientInterceptor func(
     ctx context.Context, 
     method string, 
@@ -711,7 +711,7 @@ type UnaryClientInterceptor func(
 
 ​	客户端流拦截器的实现包括预处理和流操作拦截，并不能在事后进行RPC方法调用和后处理，而是拦截用户对流的操作。
 
-```go
+``` go
 type StreamClientInterceptor func(
     ctx context.Context, 
     desc *StreamDesc, 
@@ -728,7 +728,7 @@ type StreamClientInterceptor func(
 
 ​	服务端一元拦截器类型为`UnaryServerInterceptor` ，一共包含4个参数，包括RPC上下文、RPC请求参数、RPC方法的所有信息、RPC方法本身。
 
-```go
+``` go
 type UnaryServerInterceptor func(
     ctx context.Context, 
     req interface{}, 

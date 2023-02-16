@@ -1,0 +1,14 @@
+syntax = "proto3";
+option go_package=".;grpcMiddlewareServer";
+
+message helloRequest{
+  string requestName = 1;
+}
+
+message helloResponse {
+  string responseMsg = 1;
+}
+
+service Hello{
+  rpc sayhello (helloRequest) returns (helloResponse){};
+}

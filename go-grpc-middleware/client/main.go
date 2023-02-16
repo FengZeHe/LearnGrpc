@@ -15,8 +15,7 @@ import (
 var client pb.HelloClient
 
 func main() {
-	conn, err := grpc.Dial("127.0.0.1:9098", grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(LogUnaryInterceptor()))
+	conn, err := grpc.Dial("127.0.0.1:9098", grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithUnaryInterceptor(LogUnaryInterceptor()))
 	if err != nil {
 		log.Fatalf("error", err)
 	}
@@ -32,7 +31,6 @@ func main() {
 
 func LogUnaryInterceptor() grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
-
 		//预处理
 		start := time.Now()
 
@@ -41,8 +39,7 @@ func LogUnaryInterceptor() grpc.UnaryClientInterceptor {
 		err := invoker(ctx, method, req, reply, cc, opts...)
 		end := time.Now()
 
-		log.Fatalf(" RPC %s clientOS :%v ,start time: %v,end time: %v", method, cos, start.Format(time.RFC3339), end.Format(time.RFC3339))
+		log.Fatalf("client Inceptor 1: RPC %s clientOS :%v ,start time: %v,end time: %v", method, cos, start.Format(time.RFC3339), end.Format(time.RFC3339))
 		return err
-
 	}
 }

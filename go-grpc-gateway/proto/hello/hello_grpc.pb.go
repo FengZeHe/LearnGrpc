@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.2.0
 // - protoc             v3.21.12
-// source: hello.proto
+// source: hello/hello.proto
 
-package gatewayServer
+package proto
 
 import (
 	context "context"
@@ -35,7 +35,7 @@ func NewHelloClient(cc grpc.ClientConnInterface) HelloClient {
 
 func (c *helloClient) Sayhello(ctx context.Context, in *HelloRequest, opts ...grpc.CallOption) (*HelloResponse, error) {
 	out := new(HelloResponse)
-	err := c.cc.Invoke(ctx, "/Hello/sayhello", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/hello.Hello/sayhello", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func _Hello_Sayhello_Handler(srv interface{}, ctx context.Context, dec func(inte
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/Hello/sayhello",
+		FullMethod: "/hello.Hello/sayhello",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(HelloServer).Sayhello(ctx, req.(*HelloRequest))
@@ -92,7 +92,7 @@ func _Hello_Sayhello_Handler(srv interface{}, ctx context.Context, dec func(inte
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Hello_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "Hello",
+	ServiceName: "hello.Hello",
 	HandlerType: (*HelloServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -101,5 +101,5 @@ var Hello_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "hello.proto",
+	Metadata: "hello/hello.proto",
 }

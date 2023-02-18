@@ -747,13 +747,221 @@ type UnaryServerInterceptor func(
 
 
 
-
-
 ## gRPC流
 
-### 什么是gRPC流
+### 概述
 
-### gRPC流的分类
+​	当数据量大或者需要不断传输数据的时候，就应该使用流式RPC，它允许我们一边处理一边传输数据。流式RPC分为服务端流式RPC和客户端流式RPC。服务端流式RPC过程是：客户端发送请求到服务器，拿到一个流读取返回的消息队列。客户端读取返回的流，直到里面没有任何消息。客户端流式RPC的过程是：客户端不断向服务端发送数据流，在发送结束后由服务端返回一个响应。
+
+### 实践
+
+#### 实现服务端流
+
+1. 定义proto文件
+
+   ```protobuf
+   syntax ="proto3";
+   option go_package = ".;StreamServer";
+   // 定义发送请求消息
+   message SimpleRequest{
+     string data = 1;
+   }
+   // 定义流式相应消息
+   message StreamResponse{
+     string stream_value = 1;
+   }
+   
+   // 定义服务方法ListValue
+   service StreamServer {
+   	// 流式服务端RPC，因此在returns的参数天 stream
+     rpc ListValue(SimpleRequest) returns(stream StreamResponse){};
+   }
+   ```
+
+2. 编译proto文件
+
+   ```
+   protoc --go_out=. *.proto
+   protoc --go-grpc_out=. *.proto
+   ```
+
+3. 编写Server端的程序
+
+    - 主要是实现定义的ListValue方法
+
+   ```
+   
+   ```
+
+
+
+4. 编写Client端的程序
+
+
+
+
+
+### gRPC 拦截器
+
+#### 概述
+
+gRPC提供了拦截器(Interceptor)功能，包括客户端拦截器和服务端拦截器。可以在接收到请求或者发起请求之前优先对氢气中的数据做一些处理后再转交给指定服务处理相应；很适合做处理验证、日志等流程。
+
+#### 拦截器有哪些类型
+
+- `UnaryServerInterceptor` 服务端拦截，在服务端接收请求的时候进行拦截。
+
+- `UnaryClientInterceptor` 客户端拦截器，在客户端真正发起调用之前，进行拦截。
+
+- `StreamClientInterceptor` 在流式客户端调用时，通过拦截 clientstream 的创建，返回一个自定义的 clientstream, 可以做一些额外的操作。
+
+- `StreamServerInterceptor` 在服务端接收到流式请求的时候进行拦截。
+
+### 客户端
+
+##### 客户端一元拦截器(Client Interceptor)
+
+​	客户端的一元拦截器类型为`UnaryClientInterceptor`,实现分为`预处理(pre-poressing)`、`调用RPC方法(invoking RPC method)`和`后处理(post-processing)`三个阶段。
+
+​	参数含义如下：
+
+- `ctx` ：Go语言中的上下文，一般和Goroutine配合使用，起到超时控制的效果。
+- `method`: 当前调用的RPC方法名
+- `req` ： 本次请求的参数，只有在**处理前**阶段修改才有效
+- `reply` ： 本次请求响应，需要在**处理后** 阶段才能获得
+- `cc` : gRPC连接信息
+- `invoker` ： 可以看做是当前RPC方法，一般在拦截器中调用invoker能达到调用RPC方法的效果，底层也是RPC处理
+- `opts` ：本次调用指定的options信息
+
+``` go
+type UnaryClientInterceptor func(
+    ctx context.Context, 
+    method string, 
+    req, 
+    reply interface{}, 
+    cc *ClientConn, 
+    invoker UnaryInvoker, 
+    opts ...CallOption,
+) error
+```
+
+##### 客户端流拦截器 (Stream Interceptor)
+
+​	客户端流拦截器的实现包括预处理和流操作拦截，并不能在事后进行RPC方法调用和后处理，而是拦截用户对流的操作。拦截器的区别也体现在请求参数上，如req参数变成了streamer。拦截过程
+
+``` go
+type StreamClientInterceptor func(
+    ctx context.Context, 
+    desc *StreamDesc, 
+    cc *ClientConn, 
+    method string, 
+    streamer Streamer, 
+    opts ...CallOption,
+) (ClientStream, error)
+```
+
+##### 异同
+
+流式拦截器同样分为三个阶段：**预处理、调用RPC方法、后处理**。预处理阶段和一元拦截器类似，但后面两个阶段则不同；StreamAPI的请求和响应都是通过Stream进行传递的，更进一步是通过Streamer调用SendMsg和RecvMsg这两个方法获取的。然后Streamer又是低啊用RPC方法来获得，所以在流拦截器中我们可以对streamer进行包装，进而实现SendMsg和RecvMsg这两个方法。
+
+### 服务端
+
+##### 服务端一元拦截器
+
+​	服务端一元拦截器类型为`UnaryServerInterceptor` ，一共包含4个参数，包括RPC上下文、RPC请求参数、RPC方法的所有信息、RPC方法真正执行的逻辑。
+
+``` go
+type UnaryServerInterceptor func(
+    ctx context.Context, 
+    req interface{}, 
+    info *UnaryServerInfo, 
+    handler UnaryHandler,
+) (resp interface{}, err error)
+```
+
+##### 服务端流拦截器
+
+​	服务端流拦截器类型为`StreamServerInterceptor`，
+
+```
+type StreamClientInterceptor func(
+    ctx context.Context, 
+    desc *StreamDesc, 
+    cc *ClientConn, 
+    method string, 
+    streamer Streamer, 
+    opts ...CallOption,
+) (ClientStream, error)
+```
+
+
+
+
+
+#### 实践
+
+##### 实现客户端和服务端的一元拦截器
+
+
+
+
+
+
+
+## 
+
+## go-grpc-middlware
+
+
+
+## go-grpc-gateway
+
+
+
+#### 步骤
+
+1. 写一个grpc服务器
+2. 添加gRPC注释（注释定义gRPC服务映射到JSON请求和响应，使用protobuf 时每个RPC服务必须使用google.api.HTTP来注释定义HTTP定义和路径）
+
+``` golang
+protoc -I ./proto \
+   --go_out ./proto --go_opt paths=source_relative \
+   --go-grpc_out ./proto --go-grpc_opt paths=source_relative \
+   --grpc-gateway_out ./proto --grpc-gateway_opt paths=source_relative \
+   ./proto/hello/hello.proto
+```
+
+
+
+### go-grpc-gateway with Swagger
+
+
+
+
+
+
+
+```
+protoc --proto_path=./proto \
+   --go_out=./proto --go_opt=paths=source_relative \
+  --go-grpc_out=./proto --go-grpc_opt=paths=source_relative \
+  --grpc-gateway_out=./proto --grpc-gateway_opt=paths=source_relative \
+  ./proto/hello/hello.proto
+
+```
+
+
+
+```
+protoc -I ./proto \
+  --go_out ./proto --go_opt paths=source_relative \
+  --go-grpc_out ./proto --go-grpc_opt paths=source_relative \
+  --grpc-gateway_out ./proto --grpc-gateway_opt paths=source_relative \
+  ./proto/hello/hello.proto
+```
+
+
+
 
 
 

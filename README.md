@@ -895,20 +895,47 @@ type StreamClientInterceptor func(
 ```
 
 
-
-
-
 #### 实践
 
 ##### 实现客户端和服务端的一元拦截器
+- 客户端实现一元拦截器在`grpc.Dail()`指定即可
+  ``` go
+  //  实现客户端一元拦截器
+    conn, err := grpc.Dial("127.0.0.1:9097", grpc.WithTransportCredentials(creds), grpc.WithUnaryInterceptor(LogUnaryClientIntercrptor()))
+    
+  // 定义客户端一元拦截器 LogUnaryClientInterceptor()
+    func LogUnaryClientIntercrptor() grpc.UnaryClientInterceptor {
+    return func(ctx context.Context, method string, req, reply interface{},
+		cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+        ...xxx
+    }
+  }
+  ```
+- 服务端实现一元拦截器在`grpc.NewServer()`指定即可
+  ``` go
+  //服务端实现一元拦截器
+	 grpcserver := grpc.NewServer(grpc.Creds(creds), grpc.UnaryInterceptor(LogUnaryServerInterceptor()))
+    
+  // 服务端定义一元拦截器 定义名字LogUnaryServerInterceptor的一元拦截器
+  func LogUnaryServerInterceptor() grpc.UnaryServerInterceptor {
+	 return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo,
+		handler grpc.UnaryHandler) (resp interface{}, err error) {
+     xxxx...
+  }
+  ```
+- 完整的代码在这里 `https://github.com/FengZeHe/LearngRPC/tree/main/go-grpc-interceptor`
+  
 
 
+#### 实现客户端和服务端流拦截器
+
+- 概述
+流拦截器过程分为3个阶段：
+1. 预处理(pre-processing)
+2. 调用RPC方法(invoking RPC method)
+3. 后处理(post-processing)
 
 
-
-
-
-## 
 
 ## go-grpc-middlware
 

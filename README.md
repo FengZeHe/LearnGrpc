@@ -751,52 +751,273 @@ type UnaryServerInterceptor func(
 
 ### 概述
 
-​	当数据量大或者需要不断传输数据的时候，就应该使用流式RPC，它允许我们一边处理一边传输数据。流式RPC分为服务端流式RPC和客户端流式RPC。服务端流式RPC过程是：客户端发送请求到服务器，拿到一个流读取返回的消息队列。客户端读取返回的流，直到里面没有任何消息。客户端流式RPC的过程是：客户端不断向服务端发送数据流，在发送结束后由服务端返回一个响应。
+​	当数据量大或者需要不断传输数据的时候，就应该使用流式RPC，它允许我们一边处理一边传输数据。流式RPC分为服务端流式RPC和客户端流式RPC。**服务端流式RPC过程是：客户端发送请求到服务器，拿到一个流读取返回的消息队列。客户端读取返回的流，直到里面没有任何消息。客户端流式RPC的过程是：客户端不断向服务端发送数据流，在发送结束后由服务端返回一个响应。**
 
 ### 实践
 
-#### 实现服务端流
+#### 实现服务端流RPC
 
-1. 定义proto文件
+##### 定义proto文件
 
-   ```protobuf
-   syntax ="proto3";
-   option go_package = ".;StreamServer";
-   // 定义发送请求消息
-   message SimpleRequest{
-     string data = 1;
-   }
-   // 定义流式相应消息
-   message StreamResponse{
-     string stream_value = 1;
-   }
-   
-   // 定义服务方法ListValue
-   service StreamServer {
-   	// 流式服务端RPC，因此在returns的参数天 stream
-     rpc ListValue(SimpleRequest) returns(stream StreamResponse){};
-   }
-   ```
+``` protobuf
+syntax ="proto3";
+option go_package = ".;StreamServer";
+// 定义发送请求消息
+message SimpleRequest{
+  string data = 1;
+}
+// 定义流式相应消息
+message StreamResponse{
+  string stream_value = 1;
+}
 
-2. 编译proto文件
+// 定义服务方法ListValue
+service StreamServer {
+	// 流式服务端RPC，因此在returns的参数天 stream
+  rpc ListValue(SimpleRequest) returns(stream StreamResponse){};
+}
+```
 
-   ```
-   protoc --go_out=. *.proto
-   protoc --go-grpc_out=. *.proto
-   ```
+##### 编译proto文件
 
-3. 编写Server端的程序
+```
+protoc --go_out=. *.proto
+protoc --go-grpc_out=. *.proto
+```
 
-    - 主要是实现定义的ListValue方法
+##### 编写Server端的程序
 
-   ```
-   
-   ```
+- 主要是实现定义的ListValue方法
+
+``` go
+func (s *StreamServer) ListValue(req *pb.SimpleRequest, srv pb.StreamServer_ListValueServer) error {
+	for n := 0; n < 5; n++ {
+		err := srv.Send(&pb.StreamResponse{
+			StreamValue: req.Data + strconv.Itoa(n),
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+```
+
+##### 编写Client端的程序
+
+``` go
+func listValue() {
+	req := pb.SimpleRequest{
+		Data: "stream server grpc ",
+	}
+	stream, err := grpcClient.ListValue(context.Background(), &req)
+	if err != nil {
+		log.Fatalf("Call listvalue error:", err)
+	}
+
+	for {
+		res, err := stream.Recv()
+
+		// 判断消息流是否已经结束
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatalf("ListStr get stream error :", err)
+		}
+		log.Println(res.StreamValue)
+	}
+}
+```
+
+完整代码在这里 `https://github.com/FengZeHe/LearngRPC/tree/main/grpc-stream-server`
+
+#### 实现客户端流RPC
+
+##### 编写proto文件
+
+``` protobuf
+syntax = "proto3";
+option  go_package = ".;ClientStream";
+
+
+message StreamRequest{
+  string stream_data = 1;
+}
+
+message SimpleResponse {
+  int32 code = 1;
+  string value = 2;
+}
+
+service StreamClient{
+  rpc RouteList(stream StreamRequest) returns ( SimpleResponse){};
+}
+```
+
+##### 编写服务端程序
+
+``` go
+func (s *SimpleService) RouteList(srv pb.StreamClient_RouteListServer) error {
+	//从流中获取消息
+	for {
+		res, err := srv.Recv()
+    //如果已经读完了
+		if err == io.EOF {
+			return srv.SendAndClose(&pb.SimpleResponse{Value: "ok"})
+		}
+		if err != nil {
+			return err
+		}
+
+		log.Println(res.StreamData)
+	}
+}
+
+
+func main(){
+  ...
+  //在grpc中注册服务
+  pb.RegisterStreamClientServer(grpcServer, &SimpleService{})
+  ...
+}
+```
+
+##### 编写客户端程序
+
+``` go
+func routeList() {
+	stream, err := streamClient.RouteList(context.Background())
+	if err != nil {
+		log.Fatalf("upload list err", err)
+	}
+	for n := 0; n < 5; n++ {
+		err = stream.Send(&pb.StreamRequest{StreamData: "stream client rpc " + strconv.Itoa(n)})
+		if err != nil {
+			log.Fatalf("stream request err:", err)
+		}
+	}
+	//关闭流并获取返回的消息
+	res, err := stream.CloseAndRecv()
+	if err != nil {
+		log.Fatalf("routelist get response err", err)
+	}
+	log.Println(res.Value)
+}
+```
+
+​		完整代码在这里 `https://github.com/FengZeHe/LearngRPC/tree/main/grpc-stream-client`
 
 
 
-4. 编写Client端的程序
+#### 实现双向流式RPC
 
+##### 概述
+
+双向流式RPC的意思是客户端和服务端双方读写流发送消息序列，两个流单独操作，双方可以同时发送和接受消息。
+
+##### 编写proto文件
+
+``` protobuf
+syntax = "proto3";
+option go_package = ".;StreamConversations";
+
+message StreamRequest {
+     string question = 1;
+}
+
+message StreamResponse {
+  string answer = 1;
+}
+
+service StreamConversations {
+  rpc Conversations(stream StreamRequest) returns (stream StreamResponse){};
+}
+```
+
+##### 编译文件
+
+```
+protoc --go_out=. *.proto
+protoc --go-grpc_out=. *.proto
+```
+
+##### 编写服务端程序
+
+``` go
+//实现Conversations()方法
+func (s *StreamService) Conversations(srv pb.StreamConversations_ConversationsServer) error {
+	n := 1
+	for {
+		req, err := srv.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		err = srv.Send(&pb.StreamResponse{
+			Answer: "from stream server answer: the " + strconv.Itoa(n) + " question is " + req.Question,
+		})
+		if err != nil {
+			return err
+		}
+		n++
+		log.Printf("from stream client question: %s", req.Question)
+	}
+}
+
+func main(){
+  ...
+  //在gRPC中注册服务
+	pb.RegisterStreamConversationsServer(grpcServer, &StreamService{})
+  ...
+}
+```
+
+
+
+##### 编写客户端程序
+
+``` go
+// 实现conversations方法
+func conversations() {
+	stream, err := streamClient.Conversations(context.Background())
+	if err != nil {
+		log.Fatalf("stream failure")
+	}
+	for n := 0; n < 5; n++ {
+		err := stream.Send(&pb.StreamRequest{Question: "stream client rpc " + strconv.Itoa(n)})
+		if err != nil {
+			log.Fatalf("stream request err: %v", err)
+		}
+		res, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatalf("Conversations get stream err: %v", err)
+		}
+		// 打印返回值
+		log.Println(res.Answer)
+	}
+	err = stream.CloseSend()
+	if err != nil {
+		log.Fatalf("Conversations close stream err: %v", err)
+	}
+}
+
+
+func main(){
+  ...
+  //建立gRPC连接
+  streamClient = pb.NewStreamConversationsClient(conn)
+  conversations()
+  ...
+}
+```
+
+完整代码在这里`https://github.com/FengZeHe/LearngRPC/tree/main/grpc-stream-conversations`
 
 
 

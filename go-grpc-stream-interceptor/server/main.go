@@ -34,6 +34,7 @@ func (w *wrappedStream) SendMsg(m interface{}) (err error) {
 }
 
 func streamInterceptor(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	//包装 grpc.ServerStream 以替换 RecvMsg SendMsg这两个方法。
 	err := handler(srv, newWrappedStream(ss))
 	if err != nil {
 		fmt.Printf("RPC failed with error %v", err)

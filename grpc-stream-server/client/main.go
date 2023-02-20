@@ -34,7 +34,6 @@ func listValue() {
 		}
 		log.Println(res.StreamValue)
 	}
-
 }
 
 func main() {

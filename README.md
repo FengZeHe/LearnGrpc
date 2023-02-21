@@ -1327,7 +1327,7 @@ gRPC-Gateway是一个protoc插件。它读取gRPC服务定义并生成一个反�
 
     - 在proto文件中导入 `anntotations.proto`
 
-      ```protobuf
+      ``` protobuf
       import "google/api/annotations.proto";
       ```
 

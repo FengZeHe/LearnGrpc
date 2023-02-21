@@ -1156,63 +1156,245 @@ type StreamClientInterceptor func(
 2. 调用RPC方法(invoking RPC method)
 3. 后处理(post-processing)
 
+-  StreamAPI的请求和响应都是通过Stream进行传递的，进一步是通过Streamer调用SendMsg和RecvMsg这两个方法
+-  Streamer是调用RPC方法获取的，所以在流拦截器中我们对Stream进行包装，实现SendMsg和RecvMsg这两个方法。
+
+##### 客户端的流拦截器
+
+- 同样需要在`grpc.Dial`中指定流拦截器
+
+``` go
+// wrappedStream  用于包装 grpc.ClientStream 结构体并拦截其对应的方法。
+type wrappedStream struct {
+   grpc.ClientStream
+}
+
+func newWrappedStream(s grpc.ClientStream) grpc.ClientStream {
+	return &wrappedStream{s}
+}
+
+// 实现RecvMsg方法
+func (w *wrappedStream) RecvMsg(m interface{}) error {
+	fmt.Printf("Receive a message (Type: %T) at %v \n", m, time.Now().Format(time.RFC3339))
+	return w.ClientStream.RecvMsg(m)
+}
+
+// 实现SendMsg方法
+func (w *wrappedStream) SendMsg(m interface{}) error {
+	fmt.Printf("Send a message (Type: %T) at %v \n", m, time.Now().Format(time.RFC3339))
+	return w.ClientStream.SendMsg(m)
+}
+
+// streamInterceptor 一个简单的 stream interceptor 示例。
+func streamInterceptor(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+	s, err := streamer(ctx, desc, cc, method, opts...)
+	if err != nil {
+		return nil, err
+	}
+	// 返回的是自定义的封装过的 stream
+	return newWrappedStream(s), nil
+}
+
+```
 
 
-## go-grpc-middlware
+
+##### 服务端的流拦截器
+
+- 服务端实现流拦截器也是类似的
+
+``` go
+type wrappedStream struct {
+	grpc.ServerStream
+}
+
+func newWrappedStream(s grpc.ServerStream) grpc.ServerStream {
+	return &wrappedStream{s}
+}
+
+func (w *wrappedStream) RevcMsg(m interface{}) (err error) {
+	fmt.Printf("Receive a message (Type: %T) at %s ", m, time.Now().Format(time.RFC3339))
+	return w.ServerStream.RecvMsg(m)
+}
+
+func (w *wrappedStream) SendMsg(m interface{}) (err error) {
+	fmt.Printf("Send a message (Type %T) at %v", m, time.Now().Format(time.RFC3339))
+	return w.ServerStream.SendMsg(m)
+}
+
+func streamInterceptor(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	//包装 grpc.ServerStream 以替换 RecvMsg SendMsg这两个方法。
+	err := handler(srv, newWrappedStream(ss))
+	if err != nil {
+		fmt.Printf("RPC failed with error %v", err)
+	}
+	return err
+}
+```
+
+完整代码在这里 `https://github.com/FengZeHe/LearngRPC/tree/main/go-grpc-stream-interceptor`
+
+#### **拦截器执行过程**
+
+**一元拦截器**
+
+- 1）预处理
+- 2）调用RPC方法
+- 3）后处理
+
+**流拦截器**
+
+- 1）预处理
+- 2）调用RPC方法 获取 Streamer
+- 3）后处理
+    - 调用 SendMsg 、RecvMsg 之前
+    - 调用 SendMsg 、RecvMsg
+    - 调用 SendMsg 、RecvMsg 之后
+
+
+
+## Go gRPC Middleware
+
+#### 概述
+
+Go gRPC Middleware是一个gRPC中间件，提供了拦截器的链式功能，常用来做身份认证、日志记录、监控、客户端重连等等。
+
+##### 项目地址
+
+`https://github.com/grpc-ecosystem/go-grpc-middleware`
+
+#### 实践
+
+- 使用`Middleware`实现多个拦截器
+
+  ``` go
+  // 在项目中引用这个包
+  import "github.com/grpc-ecosystem/go-grpc-middleware"
+  
+  // 在server端定义两个Log一元拦截器
+  func LogUnaryIntercptor() grpc.UnaryServerInterceptor {
+  	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+  		...
+    }
+  }
+  
+  func LogUnaryIntercptorTwo() grpc.UnaryServerInterceptor {
+  	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+  		...
+  	}
+  }
+  
+  // 在main函数中加入这两个拦截器
+  grpcServer := grpc.NewServer(
+  		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+  			LogUnaryIntercptorTwo(),
+  			LogUnaryIntercptor(),
+  		)),
+  	)
+  ```
 
 
 
 ## go-grpc-gateway
 
 
+#### 概述
+
+gRPC-Gateway是一个protoc插件。它读取gRPC服务定义并生成一个反向代理服务器，该服务器将RESTFUL JSON API转换为gRPC；gRPC-Gateway 能同时提供 gRPC 和 RESTful 风格的 API。
+
+
 
 #### 步骤
 
-1. 写一个grpc服务器
-2. 添加gRPC注释（注释定义gRPC服务映射到JSON请求和响应，使用protobuf 时每个RPC服务必须使用google.api.HTTP来注释定义HTTP定义和路径）
+1. 写一个grpc服务器(编写proto文件+编译+客户端程序+服务端程序)
 
-``` golang
-protoc -I ./proto \
-   --go_out ./proto --go_opt paths=source_relative \
-   --go-grpc_out ./proto --go-grpc_opt paths=source_relative \
-   --grpc-gateway_out ./proto --grpc-gateway_opt paths=source_relative \
-   ./proto/hello/hello.proto
-```
+2. 引用两个文件 `annotations.proto` 和 `http.proto`
 
+   从官方存储库googleapis下载： `https://github.com/googleapis/googleapis/blob/master/google/api/annotations.proto`
 
+   `https://github.com/googleapis/googleapis/blob/master/google/api/http.proto`
 
-### go-grpc-gateway with Swagger
+   ```
+   ├── google
+   │   └── api
+   │       ├── annotations.proto
+   │       └── http.proto
+   └── hello
+       ├── hello.pb.go
+       ├── hello.proto
+       └── hello_grpc.pb.go
+   ```
 
+    - 在proto文件中导入 `anntotations.proto`
 
+      ```protobuf
+      import "google/api/annotations.proto";
+      ```
 
+3. proto文件添加gRPC注释（注释定义gRPC服务映射到JSON请求和响应，使用protobuf 时每个RPC服务必须使用google.api.HTTP来注释定义HTTP定义和路径）
 
+   ``` protobuf
+   service Hello {
+     rpc sayhello(HelloRequest) returns (HelloResponse){
+     //添加注释
+       option (google.api.http) = {
+         get: "/v1/hello/sayhello"
+       };
+     };
+   }
+   ```
 
+4. 再次编译
 
+   ```
+   protoc -I ./proto \
+      --go_out ./proto --go_opt paths=source_relative \
+      --go-grpc_out ./proto --go-grpc_opt paths=source_relative \
+      --grpc-gateway_out ./proto --grpc-gateway_opt paths=source_relative \
+      ./proto/hello/hello.proto
+   ```
 
-```
-protoc --proto_path=./proto \
-   --go_out=./proto --go_opt=paths=source_relative \
-  --go-grpc_out=./proto --go-grpc_opt=paths=source_relative \
-  --grpc-gateway_out=./proto --grpc-gateway_opt=paths=source_relative \
-  ./proto/hello/hello.proto
+   编译过后会生成`hello.pb.gw.go`文件
 
-```
+   ```
+   .
+   ├── google
+   │   └── api
+   │       ├── annotations.proto
+   │       └── http.proto
+   └── hello
+       ├── hello.pb.go
+       ├── hello.pb.gw.go
+       ├── hello.proto
+       └── hello_grpc.pb.go
+   ```
 
+5. 在main函数中添加并提供gRPC-Gateway mux
 
+   ``` go
+   	func main(){
+       xxxx...
+       conn, err := grpc.DialContext(
+         context.Background(),
+         "0.0.0.0:9099",
+         grpc.WithBlock(),
+         grpc.WithTransportCredentials(insecure.NewCredentials()),
+       )
+       if err != nil {
+         log.Fatalf("Failed to dial server:", err)
+       }
+       gwmux := runtime.NewServeMux()
+       err = pb.RegisterHelloHandler(context.Background(), gwmux, conn)
+       if err != nil {
+         log.Fatalln("Failed to register gateway:", err)
+       }
+       
+       xxx...
+   	}
+   ```
 
-```
-protoc -I ./proto \
-  --go_out ./proto --go_opt paths=source_relative \
-  --go-grpc_out ./proto --go-grpc_opt paths=source_relative \
-  --grpc-gateway_out ./proto --grpc-gateway_opt paths=source_relative \
-  ./proto/hello/hello.proto
-```
-
-
-
-
-
-
+    - 用postman测试接口
+   完整代码在这里：`https://github.com/FengZeHe/LearngRPC/tree/main/go-grpc-gateway`
 
 
 
